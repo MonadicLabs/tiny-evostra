@@ -9,16 +9,16 @@ public:
     virtual ~Environment(){}
 
     // Perform action, return new state and reward
-    double step( const tiny_dnn::Tensor& action, tiny_dnn::Tensor& new_state )
+    void step( const tiny_dnn::tensor_t& action, tiny_dnn::tensor_t& new_state, double& reward )
     {
         perform_action( action );
         new_state = state();
-        return reward;
+        reward = reward;
     }
 
     virtual double reward(){ return 0.0; }
-    virtual tiny_dnn::Tensor state(){ return tiny_dnn::Tensor(); }
-    virtual void perform_action( tiny_dnn::Tensor& action ){}
+    virtual tiny_dnn::tensor_t state(){ return tiny_dnn::tensor_t(); }
+    virtual void perform_action( tiny_dnn::tensor_t& action ){}
 
 private:
 
