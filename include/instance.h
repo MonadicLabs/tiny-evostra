@@ -9,7 +9,7 @@ public:
     virtual ~EvoStraInstance(){}
 
     virtual tiny_dnn::tensor_t getParameters(){ return tiny_dnn::tensor_t(); }
-    virtual void setParameter( tiny_dnn::tensor_t& params ){}
+    virtual void setParameters( tiny_dnn::tensor_t& params ){}
 
 private:
 
