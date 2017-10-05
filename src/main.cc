@@ -5,7 +5,10 @@
 #include <tiny_dnn/tiny_dnn.h>
 
 #include "tiny_evostra.h"
+#include "evostra.h"
+#include "utils.h"
 
+// #define DEBUG
 using namespace std;
 using namespace tiny_dnn;
 
@@ -28,6 +31,9 @@ public:
 
     virtual tiny_dnn::tensor_t step( tiny_dnn::tensor_t state )
     {
+#ifdef DEBUG
+        print_tensor( state );
+#endif
         return _nn.predict(
                     state
                     );
@@ -70,14 +76,71 @@ public:
 private:
     void init()
     {
-        _nn << fully_connected_layer<tan_h>( 10, 64 )
-            << fully_connected_layer<tan_h>( 64, 64 )
-            << fully_connected_layer<tan_h>( 64 , 1 );
+        _nn << fully_connected_layer<tan_h>( 10, 10 )
+            << fully_connected_layer<tan_h>( 10, 4 )
+            << fully_connected_layer<tan_h>( 4 , 1 );
         _nn.init_weight();
     }
 
 protected:
     network<sequential> _nn;
+
+};
+
+class ExampleEnvironment : public Environment
+{
+public:
+
+    ExampleEnvironment()
+    {
+        // cerr << "env ctor" << endl;
+        _t = 0; // ((double)(rand()) / (double)(RAND_MAX)) * 1000.0;
+        _dt = 0.01;
+    }
+
+    virtual ~ExampleEnvironment()
+    {
+        // cerr << "env dtor" << endl;
+    }
+
+    virtual double reward()
+    {
+        return _curReward;
+    }
+
+    virtual tiny_dnn::tensor_t state()
+    {
+        update_state();
+        return _curState;
+    }
+
+    virtual void perform_action( tiny_dnn::tensor_t action )
+    {
+        // Compute reward
+        double aval = action[0][0];
+        _curReward = -((aval - _expectedPred)*(aval - _expectedPred));
+    }
+
+private:
+
+    void update_state()
+    {
+        _curState = tiny_dnn::tensor_t(1);
+        _curState[0] = tiny_dnn::vec_t(10);
+        for( int k = 0; k < 10; ++k )
+        {
+            _curState[0][k] = sin( _t + (k * _dt) );
+        }
+        _t += _dt;
+        _expectedPred = sin( _t + (9 * _dt) );
+    }
+
+    tiny_dnn::tensor_t _curState;
+    double _t;
+    double _dt;
+    double _expectedPred;
+    double _curReward;
+    tiny_dnn::tensor_t _lastAction;
 
 };
 
@@ -99,5 +162,9 @@ int main( int argc, char** argv )
     {
         cerr << "x[" << k << "]=" << toutput[0][k] << endl;
     }
+
+    EvoStra< ExampleAgent, ExampleEnvironment > evostra;
+    evostra.train();
+
     return 0;
 }
