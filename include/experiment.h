@@ -24,7 +24,7 @@ public:
 
     void run()
     {
-        for( int i = 0; i < 100; ++i )
+        for( int i = 0; i < 200; ++i )
         {
             tiny_dnn::tensor_t s = _environement->state();
 #ifdef DEBUG

@@ -25,6 +25,7 @@ tiny_dnn::tensor_t randn(int sz, double mean, double stddev)
     tiny_dnn::tensor_t ret(1);
     ret[0].resize(sz);
     std::default_random_engine generator;
+    generator.seed( rand() );
     std::normal_distribution<double> distribution( mean, stddev );
     for( int k = 0; k < sz; ++k )
     {

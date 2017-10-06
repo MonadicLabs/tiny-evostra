@@ -76,9 +76,9 @@ public:
 private:
     void init()
     {
-        _nn << fully_connected_layer<tan_h>( 10, 10 )
-            << fully_connected_layer<tan_h>( 10, 4 )
-            << fully_connected_layer<tan_h>( 4 , 1 );
+        _nn << fully_connected_layer<tan_h>( 10, 200 )
+        	// << fully_connected_layer<tan_h>( 5 , 5 )
+            << fully_connected_layer<tan_h>( 200 , 1 );
         _nn.init_weight();
     }
 
@@ -95,7 +95,7 @@ public:
     {
         // cerr << "env ctor" << endl;
         _t = 0; // ((double)(rand()) / (double)(RAND_MAX)) * 1000.0;
-        _dt = 0.01;
+        _dt = 0.1;
     }
 
     virtual ~ExampleEnvironment()

@@ -37,8 +37,8 @@ public:
     {
         const int populationSize = 50;
         const int numEpochs = 100;
-        const double sigma = 0.01;
-        const double alpha = 0.0001;
+        const double sigma = 0.1;
+        const double alpha = 0.001;
 
         std::vector< std::shared_ptr< Agent > > _agents( populationSize );
         std::vector< tiny_dnn::tensor_t > _epsilons( populationSize );
@@ -105,7 +105,7 @@ public:
             double maxRawReward = maxReward;
             int best_idx = -1;
             int ii = 0;
-            for( float rv : _rewards )
+            for( float& rv : _rewards )
             {
                 if( rv > maxRawReward )
                     maxRawReward = rv;
@@ -139,7 +139,7 @@ public:
             // Apply learning rate
             for( int i = 0; i < params_size; ++i )
             {
-                s_fi_epsi[i] *= -(1.0 / (((double)populationSize) * sigma)) * alpha;
+                s_fi_epsi[i] *= (1.0 / (((double)populationSize) * sigma)) * alpha;
             }
 
             // Update parameters for real
