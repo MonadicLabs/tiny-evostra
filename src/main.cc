@@ -4,167 +4,157 @@
 
 #include <tiny_dnn/tiny_dnn.h>
 
-#include "tiny_evostra.h"
-#include "evostra.h"
+#include "include/gym/gym.h"
+
+#include "evostra2.h"
 #include "utils.h"
 
 // #define DEBUG
 using namespace std;
 using namespace tiny_dnn;
 
-// Simple example.
-// RL agent will try to predict next value of sin( ) from past 10 values
-// Reward is inverse of L2 loss
+std::vector<double> solution = { 0.5, 0.2, 0.3 };
+std::vector<double> nn_input = { 1,2,3,4,5 };
 
-class ExampleAgent : public Agent
+network< sequential > nn;
+boost::shared_ptr<Gym::Client> client;
+boost::shared_ptr<Gym::Environment> env;
+
+class Agent
 {
 public:
-    ExampleAgent()
-    {
-        init();
-    }
-
-    virtual ~ExampleAgent()
-    {
-
-    }
-
-    virtual tiny_dnn::tensor_t step( tiny_dnn::tensor_t state )
-    {
-#ifdef DEBUG
-        print_tensor( state );
-#endif
-        return _nn.predict(
-                    state
-                    );
-    }
-
-    virtual tensor_t getParameters()
-    {
-        tensor_t ret(1);
-        for( auto popo = _nn.begin(); popo != _nn.end(); popo++ )
-        {
-            // cerr << (*popo)->weights().size() << " - " << (*popo)->weights()[0]->size() << " - " << (*popo)->weights()[1]->size() << endl;
-            for( int k = 0; k < (*popo)->weights().size(); ++k )
-            {
-                for( int i = 0; i < (*popo)->weights()[k]->size(); ++i )
-                {
-                    ret[0].push_back( (*popo)->weights()[k]->operator[](i) );
-                }
-            }
-        }
-        return ret;
-    }
-
-    virtual void setParameters( tensor_t& params )
-    {
-        int offset = 0;
-        for( auto popo = _nn.begin(); popo != _nn.end(); popo++ )
-        {
-            for( int k = 0; k < (*popo)->weights().size(); ++k )
-            {
-                for( int i = 0; i < (*popo)->weights()[k]->size(); ++i )
-                {
-                    (*popo)->weights()[k]->operator[](i) = params[0][offset];
-                    offset++;
-                }
-            }
-        }
-
-    }
 
 private:
-    void init()
-    {
-        _nn << fully_connected_layer<tan_h>( 10, 200 )
-        	// << fully_connected_layer<tan_h>( 5 , 5 )
-            << fully_connected_layer<tan_h>( 200 , 1 );
-        _nn.init_weight();
-    }
 
 protected:
-    network<sequential> _nn;
 
 };
 
-class ExampleEnvironment : public Environment
+double get_reward( std::vector<double> w )
 {
-public:
+    setParameters(nn, w);
+    vec_t res = nn.predict( nn_input );
+    std::vector<double> resd;
+    for( auto vv : res )
+        resd.push_back( vv );
+    return -sqnorm( resd, solution );
+}
 
-    ExampleEnvironment()
-    {
-        // cerr << "env ctor" << endl;
-        _t = 0; // ((double)(rand()) / (double)(RAND_MAX)) * 1000.0;
-        _dt = 0.1;
-    }
+static
+void run_single_environment(
+        const boost::shared_ptr<Gym::Client>& client,
+        const std::string& env_id,
+        int episodes_to_run)
+{
 
-    virtual ~ExampleEnvironment()
-    {
-        // cerr << "env dtor" << endl;
-    }
+    boost::shared_ptr<Gym::Space> action_space = env->action_space();
+    boost::shared_ptr<Gym::Space> observation_space = env->observation_space();
 
-    virtual double reward()
-    {
-        return _curReward;
-    }
+    for (int e=0; e<episodes_to_run; ++e) {
+        printf("%s episode %i...\n", env_id.c_str(), e);
+        Gym::State s;
+        env->reset(&s);
+        float total_reward = 0;
+        int total_steps = 0;
+        while (1) {
+            std::vector<float> action = action_space->sample();
+            try{
+            env->step(action, true, &s);
+            assert(s.observation.size()==observation_space->sample().size());
+            total_reward += s.reward;
+            total_steps += 1;
+            }
+            catch( ... )
+            {
+                cerr << "GYM ERROR ! " << endl;
+            }
 
-    virtual tiny_dnn::tensor_t state()
-    {
-        update_state();
-        return _curState;
-    }
-
-    virtual void perform_action( tiny_dnn::tensor_t action )
-    {
-        // Compute reward
-        double aval = action[0][0];
-        _curReward = -((aval - _expectedPred)*(aval - _expectedPred));
-    }
-
-private:
-
-    void update_state()
-    {
-        _curState = tiny_dnn::tensor_t(1);
-        _curState[0] = tiny_dnn::vec_t(10);
-        for( int k = 0; k < 10; ++k )
-        {
-            _curState[0][k] = sin( _t + (k * _dt) );
+            if (s.done) break;
         }
-        _t += _dt;
-        _expectedPred = sin( _t + (9 * _dt) );
+        printf("%s episode %i finished in %i steps with reward %0.2f\n",
+               env_id.c_str(), e, total_steps, total_reward);
+    }
+}
+
+double get_reward2( std::vector<double> w )
+{
+    double total_reward = 0.0;
+    setParameters( nn, w );
+
+    int num_episodes = 1;
+    Gym::State s;
+
+    for( int episode = 0; episode < num_episodes; ++episode )
+    {
+
+        boost::shared_ptr<Gym::Space> action_space = env->action_space();
+        boost::shared_ptr<Gym::Space> observation_space = env->observation_space();
+
+        std::vector<float> action = action_space->sample();
+        std::vector<float> state = observation_space->sample();
+        /*
+        cerr << "action_size" << action.size() << endl;
+        cerr << "state_size" << state.size() << endl;
+        */
+        env->reset(&s);
+
+        while(true)
+        {
+            state = s.observation;
+            vec_t nn_state( state.size() );
+            std::copy( state.begin(), state.end(), nn_state.begin() );
+
+            vec_t nn_action = nn.predict( nn_state );
+            std::copy( nn_action.begin(), nn_action.end(), action.begin() );
+
+            env->step(action, true, &s);
+            assert(s.observation.size()==observation_space->sample().size());
+            total_reward += s.reward;
+            if (s.done) break;
+        }
     }
 
-    tiny_dnn::tensor_t _curState;
-    double _t;
-    double _dt;
-    double _expectedPred;
-    double _curReward;
-    tiny_dnn::tensor_t _lastAction;
+    return total_reward;
 
-};
+}
 
 int main( int argc, char** argv )
 {
-    srand(time(NULL));
-    Agent* a = new ExampleAgent();
-    tensor_t tinput(1);
-    tinput[0] = vec_t(10);
-    tensor_t toutput = a->getParameters();
-    toutput[0][ toutput[0].size() - 1 ] = 777;
-    a->setParameters( toutput );
-    for( int k = 0; k < toutput[0].size(); ++k )
-    {
-        cerr << "t[" << k << "]=" << toutput[0][k] << endl;
-    }
-    toutput = a->step(tinput);
-    for( int k = 0; k < toutput[0].size(); ++k )
-    {
-        cerr << "x[" << k << "]=" << toutput[0][k] << endl;
-    }
 
-    EvoStra< ExampleAgent, ExampleEnvironment > evostra;
-    evostra.train();
+    /*
+    try {
+        boost::shared_ptr<Gym::Client> client = Gym::client_create("127.0.0.1", 5000);
+        run_single_environment(client, "BipedalWalker-v2", 30);
+
+    } catch (const std::exception& e) {
+        fprintf(stderr, "ERROR: %s\n", e.what());
+        return 1;
+    }
+    */
+
+    srand( time(NULL) );
+
+    client = Gym::client_create("127.0.0.1", 5000);
+    env = client->make("CartPole-v0");
+
+    nn << fully_connected_layer<tiny_dnn::activation::relu>( 4, 8 )
+       << fully_connected_layer<relu>( 8 ,16 )
+       << fully_connected_layer<activation::tan_h>( 16,1 );
+    nn.init_weight();
+
+    std::vector<double> weights = getParameters( nn );
+    // randn( weights, 3 );
+
+    EvolutionStrategy<> * es = new EvolutionStrategy<>( weights, get_reward2, 20, 0.1, 0.05 );
+    es->run( 3000, 1 );
+
+    setParameters( nn, es->getWeights() );
+    vec_t res = nn.predict( nn_input );
+    std::vector<double> resd;
+    for( auto vv : res )
+        resd.push_back( vv );
+
+    std::cerr << "RESULTS: " << resd << endl;
 
     return 0;
 }

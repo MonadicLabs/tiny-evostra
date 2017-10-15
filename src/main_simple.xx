@@ -1,0 +1,53 @@
+#include <iostream>
+
+#include <unistd.h>
+
+#include <tiny_dnn/tiny_dnn.h>
+
+#include "evostra2.h"
+#include "utils.h"
+
+// #define DEBUG
+using namespace std;
+using namespace tiny_dnn;
+
+std::vector<double> solution = { 0.5, 0.2, 0.3 };
+std::vector<double> nn_input = { 1,2,3,4,5 };
+
+network< sequential > nn;
+
+double get_reward( std::vector<double> w )
+{
+    setParameters(nn, w);
+    vec_t res = nn.predict( nn_input );
+    std::vector<double> resd;
+    for( auto vv : res )
+        resd.push_back( vv );
+    return -sqnorm( resd, solution );
+}
+
+int main( int argc, char** argv )
+{
+
+    srand( time(NULL) );
+
+    nn << fully_connected_layer<tiny_dnn::activation::leaky_relu>( 5, 8 )
+        << fully_connected_layer<leaky_relu>( 8 ,3 );
+    nn.init_weight();
+
+    std::vector<double> weights = getParameters( nn );
+    // randn( weights, 3 );
+
+    EvolutionStrategy<> * es = new EvolutionStrategy<>( weights, get_reward, 50, 0.1, 0.0001 );
+    es->run( 3000, 100 );
+
+    setParameters( nn, es->getWeights() );
+    vec_t res = nn.predict( nn_input );
+    std::vector<double> resd;
+    for( auto vv : res )
+        resd.push_back( vv );
+
+    std::cerr << "RESULTS: " << resd << endl;
+
+    return 0;
+}

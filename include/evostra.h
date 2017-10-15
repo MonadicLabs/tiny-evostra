@@ -35,10 +35,10 @@ public:
 
     void train()
     {
-        const int populationSize = 50;
+        const int populationSize = 25;
         const int numEpochs = 100;
         const double sigma = 0.1;
-        const double alpha = 0.001;
+        const double alpha = 0.01;
 
         std::vector< std::shared_ptr< Agent > > _agents( populationSize );
         std::vector< tiny_dnn::tensor_t > _epsilons( populationSize );
@@ -54,22 +54,20 @@ public:
 
         const int params_size = _agents[0]->getParameters()[0].size();
 
+        for( int k = 0; k < populationSize; ++k )
+        {
+            _thetas[ k ] = randn( params_size, 0.0, 1.0 );
+        }
+
         // FOR EACH EPOCH
         for( int i = 0; i < numEpochs; ++i )
         {
             cerr << "EPOCH #" << i << endl;
 
-            // Save current parameters
-            for( int k = 0; k < populationSize; ++k )
-            {
-                std::shared_ptr<Agent> a = _agents[k];
-                _thetas[k] = a->getParameters();
-            }
-
             // Sample perturbations
             for( int k = 0; k < populationSize; ++k )
             {
-                _epsilons[k] = randn( params_size, 0.0, sigma );
+                _epsilons[k] = randn( params_size, 0.0, 1.0 );
             }
 
             // Add perturbation to net parameters
@@ -77,7 +75,7 @@ public:
             {
                 tiny_dnn::tensor_t theta = _thetas[k];
                 tiny_dnn::tensor_t epsilon = _epsilons[k];
-                theta = add_tensor(theta, epsilon );
+                theta = add_tensor( theta, epsilon, sigma );
                 _agents[k]->setParameters( theta );
             }
 
@@ -139,7 +137,7 @@ public:
             // Apply learning rate
             for( int i = 0; i < params_size; ++i )
             {
-                s_fi_epsi[i] *= (1.0 / (((double)populationSize) * sigma)) * alpha;
+                s_fi_epsi[i] *= (alpha / (((double)populationSize) * sigma));
             }
 
             // Update parameters for real
@@ -148,6 +146,7 @@ public:
                 std::shared_ptr<Agent> a = _agents[ k ];
                 a->setParameters( _thetas[k] );
                 a->train( s_fi_epsi );
+                _thetas[k] = a->getParameters();
             }
 
             // Reset current experiments
